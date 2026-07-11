@@ -31,6 +31,10 @@ type Props = {
   handleEmailClear: () => void;
   handleAuthStep: (step: EAuthSteps) => void;
   nextPath: string | undefined;
+  // When true this form is shown as the initial combined login (email + password on
+  // one screen, single submit) instead of being reached after a separate email step.
+  // The email field becomes editable so password managers can fill the whole login at once.
+  emailEditable?: boolean;
 };
 
 type TPasswordFormValues = {
@@ -47,7 +51,7 @@ const defaultValues: TPasswordFormValues = {
 const authService = new AuthService();
 
 export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props) {
-  const { email, isSMTPConfigured, handleAuthStep, handleEmailClear, mode, nextPath } = props;
+  const { email, isSMTPConfigured, handleAuthStep, handleEmailClear, mode, nextPath, emailEditable = false } = props;
   // plane imports
   const { t } = useTranslation();
   // ref
@@ -107,10 +111,11 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
     () =>
       !isSubmitting &&
       !!passwordFormData.password &&
+      (emailEditable ? !!passwordFormData.email : true) &&
       (mode === EAuthModes.SIGN_UP ? passwordFormData.password === passwordFormData.confirm_password : true)
         ? false
         : true,
-    [isSubmitting, mode, passwordFormData.confirm_password, passwordFormData.password]
+    [isSubmitting, mode, emailEditable, passwordFormData.email, passwordFormData.confirm_password, passwordFormData.password]
   );
 
   const password = passwordFormData?.password ?? "";
@@ -177,14 +182,18 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
           <div className={`relative flex items-center rounded-md border border-strong bg-surface-1`}>
             <Input
               id="email"
-              name="email"
-              type="email"
+              // In combined mode use a plain username field (not type=email / name=email) so the
+              // browser's own email-history dropdown doesn't hijack the field and hide 1Password's
+              // login suggestion. The value is still submitted via the hidden `email` field above.
+              name={emailEditable ? "username" : "email"}
+              type={emailEditable ? "text" : "email"}
+              inputMode="email"
               value={passwordFormData.email}
               onChange={(e) => handleFormChange("email", e.target.value)}
               placeholder={t("auth.common.email.placeholder")}
               className={`h-10 w-full border-0 disable-autofill-style placeholder:text-placeholder`}
               autoComplete="username"
-              disabled
+              disabled={!emailEditable}
             />
             {passwordFormData.email.length > 0 && (
               <button

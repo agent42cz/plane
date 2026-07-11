@@ -103,6 +103,27 @@ export const AuthFormRoot = observer(function AuthFormRoot(props: TAuthFormRoot)
       });
   };
 
+  // For instances that only use email+password auth (no magic-code routing), show a single
+  // combined login form (email + password on one screen, one submit) instead of the two-step
+  // email-first flow. This lets password managers (1Password) fill the whole login at once.
+  const isCredentialOnly = (config?.is_email_password_enabled ?? false) && !(config?.is_magic_login_enabled ?? false);
+  if (isCredentialOnly && (authStep === EAuthSteps.EMAIL || authStep === EAuthSteps.PASSWORD)) {
+    return (
+      <AuthPasswordForm
+        mode={authMode}
+        isSMTPConfigured={isSMTPConfigured}
+        email={email}
+        handleEmailClear={handleEmailClear}
+        handleAuthStep={(step: EAuthSteps) => {
+          if (step === EAuthSteps.UNIQUE_CODE) generateEmailUniqueCode(email);
+          setAuthStep(step);
+        }}
+        nextPath={nextPath || undefined}
+        emailEditable
+      />
+    );
+  }
+
   if (authStep === EAuthSteps.EMAIL) {
     return <AuthEmailForm defaultEmail={email} onSubmit={handleEmailVerification} />;
   }
