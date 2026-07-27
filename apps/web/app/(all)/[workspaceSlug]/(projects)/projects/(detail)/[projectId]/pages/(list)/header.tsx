@@ -18,6 +18,8 @@ import type { TPage } from "@plane/types";
 import { Breadcrumbs, Header } from "@plane/ui";
 // helpers
 import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
+// components
+import { ImportMarkdownModal } from "@/components/pages/modals/import-markdown-modal";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 // plane web imports
@@ -27,6 +29,7 @@ import { EPageStoreType, usePageStore } from "@/hooks/store";
 export const PagesListHeader = observer(function PagesListHeader() {
   // states
   const [isCreatingPage, setIsCreatingPage] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   // router
   const router = useRouter();
   const { workspaceSlug, projectId } = useParams();
@@ -46,7 +49,7 @@ export const PagesListHeader = observer(function PagesListHeader() {
     await createPage(payload)
       .then((res) => {
         const pageId = `/${workspaceSlug}/projects/${currentProjectDetails?.id}/pages/${res?.id}`;
-        router.push(pageId);
+        return router.push(pageId);
       })
       .catch((err) => {
         setToast({
@@ -81,6 +84,10 @@ export const PagesListHeader = observer(function PagesListHeader() {
           <Button variant="primary" size="lg" onClick={handleCreatePage} loading={isCreatingPage}>
             {isCreatingPage ? "Adding" : "Add page"}
           </Button>
+          <Button variant="secondary" size="lg" onClick={() => setIsImportOpen(true)}>
+            Import .md
+          </Button>
+          <ImportMarkdownModal isOpen={isImportOpen} handleClose={() => setIsImportOpen(false)} />
         </Header.RightItem>
       )}
     </Header>
