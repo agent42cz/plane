@@ -48,15 +48,15 @@ export const orderPages = (
 
   if (sortByKey === "name") {
     orderedPages = sortBy(pages, [(m) => m.name?.toLowerCase()]);
-    if (sortByOrder === "desc") orderedPages = orderedPages.reverse();
+    if (sortByOrder === "desc") orderedPages = orderedPages.toReversed();
   }
   if (sortByKey === "created_at") {
     orderedPages = sortBy(pages, [(m) => m.created_at]);
-    if (sortByOrder === "desc") orderedPages = orderedPages.reverse();
+    if (sortByOrder === "desc") orderedPages = orderedPages.toReversed();
   }
   if (sortByKey === "updated_at") {
     orderedPages = sortBy(pages, [(m) => m.updated_at]);
-    if (sortByOrder === "desc") orderedPages = orderedPages.reverse();
+    if (sortByOrder === "desc") orderedPages = orderedPages.toReversed();
   }
 
   return orderedPages;
@@ -80,6 +80,8 @@ export const shouldFilterPage = (page: TPage, filters: TPageFilterProps | undefi
         fallsInFilters = fallsInFilters && !!createdDate && satisfiesDateFilter(createdDate, dateFilter);
       });
     }
+    if (filterKey === "labels" && filters?.labels && filters.labels.length > 0)
+      fallsInFilters = fallsInFilters && filters.labels.some((labelId) => (page.label_ids ?? []).includes(labelId));
   });
   if (filters?.favorites && !page.is_favorite) fallsInFilters = false;
 
