@@ -27,6 +27,8 @@ type Props = {
   handleClose: () => void;
 };
 
+const MAX_MARKDOWN_BYTES = 2 * 1024 * 1024; // 2 MB
+
 export const ImportMarkdownModal = observer(function ImportMarkdownModal(props: Props) {
   const { isOpen, handleClose } = props;
   // states
@@ -86,6 +88,14 @@ export const ImportMarkdownModal = observer(function ImportMarkdownModal(props: 
       });
       return;
     }
+    if (markdown.length > MAX_MARKDOWN_BYTES) {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Error!",
+        message: "Soubor je příliš velký (max 2 MB).",
+      });
+      return;
+    }
     if (!workspaceSlug || !projectId) return;
 
     setIsImporting(true);
@@ -100,9 +110,13 @@ export const ImportMarkdownModal = observer(function ImportMarkdownModal(props: 
       (payload as TPage & { labels?: string[] }).labels = selectedLabelIds;
 
       const res = await createPage(payload);
-      resetState();
-      handleClose();
-      router.push(`/${workspaceSlug}/projects/${projectId}/pages/${res?.id}`);
+      if (res?.id) {
+        resetState();
+        handleClose();
+        router.push(`/${workspaceSlug}/projects/${projectId}/pages/${res.id}`);
+      } else {
+        setToast({ type: TOAST_TYPE.ERROR, title: "Error!", message: "Stránku se nepodařilo vytvořit." });
+      }
     } catch (error: any) {
       const errorCode = error?.error_code ?? error?.data?.error_code;
       setToast({
@@ -126,7 +140,13 @@ export const ImportMarkdownModal = observer(function ImportMarkdownModal(props: 
         <div className="space-y-2">
           <input ref={fileInputRef} type="file" accept=".md,.markdown" onChange={handleFileChange} className="hidden" />
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" type="button" onClick={() => fileInputRef.current?.click()}>
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+            >
               Choose file
             </Button>
             {fileName && <span className="truncate text-12 text-tertiary">{fileName}</span>}
@@ -158,7 +178,7 @@ export const ImportMarkdownModal = observer(function ImportMarkdownModal(props: 
         </div>
       </div>
       <div className="flex items-center justify-end gap-2 border-t-[0.5px] border-subtle px-5 py-4">
-        <Button variant="secondary" size="lg" onClick={handleCloseModal}>
+        <Button variant="secondary" size="lg" onClick={handleCloseModal} disabled={isImporting}>
           Cancel
         </Button>
         <Button variant="primary" size="lg" onClick={handleImport} loading={isImporting}>
