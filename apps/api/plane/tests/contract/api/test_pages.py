@@ -100,6 +100,43 @@ class TestPagesPublicListAPI:
         names = {p["name"] for p in resp.data["results"]}
         assert names == {"Public Doc"}
 
+    @pytest.mark.django_db
+    def test_list_excludes_page_when_user_not_member_of_queried_project(
+        self, api_key_client, workspace, project, create_user
+    ):
+        """A page shared into projects {A, B} must not be visible under B's URL
+        for a user who is only an active member of A.
+
+        Regresses a bug where the queryset chained separate .filter() calls on
+        the `projects` M2M, letting the membership predicate and the project_id
+        predicate be satisfied by different joined rows.
+        """
+        project_a = project  # api-token user IS an active member (fixture default)
+        project_b = Project.objects.create(
+            name="Project B", identifier="PB", workspace=workspace, created_by=create_user
+        )
+        # Note: no ProjectMember row for create_user on project_b.
+
+        page = make_page(project_a, create_user, "Shared Doc", access=0)
+        ProjectPage.objects.create(
+            workspace=workspace, project=project_b, page=page,
+            created_by=create_user, updated_by=create_user,
+        )
+
+        # Sanity: visible under A's list URL.
+        resp_a = api_key_client.get(list_url(workspace.slug, project_a.id))
+        assert resp_a.status_code == status.HTTP_200_OK
+        assert {p["name"] for p in resp_a.data["results"]} == {"Shared Doc"}
+
+        # Must be absent under B's list URL (user is not a member of B).
+        resp_b = api_key_client.get(list_url(workspace.slug, project_b.id))
+        assert resp_b.status_code == status.HTTP_200_OK
+        assert page.id not in {p["id"] for p in resp_b.data["results"]}
+
+        # Retrieve under B's URL must 404.
+        detail_resp_b = api_key_client.get(detail_url(workspace.slug, project_b.id, page.id))
+        assert detail_resp_b.status_code == status.HTTP_404_NOT_FOUND
+
 
 def detail_url(slug, pid, pk):
     return f"/api/v1/workspaces/{slug}/projects/{pid}/pages/{pk}/"

@@ -26,12 +26,12 @@ class PageListAPIEndpoint(BaseAPIView):
     def get_queryset(self):
         return (
             Page.objects.filter(workspace__slug=self.kwargs.get("slug"))
-            .filter(projects__id=self.kwargs.get("project_id"))
             .filter(
+                projects__id=self.kwargs.get("project_id"),
                 projects__project_projectmember__member=self.request.user,
                 projects__project_projectmember__is_active=True,
+                projects__archived_at__isnull=True,
             )
-            .filter(projects__archived_at__isnull=True)
             .filter(access=0, archived_at__isnull=True)
             .annotate(
                 label_ids=Coalesce(
