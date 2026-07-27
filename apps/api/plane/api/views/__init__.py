@@ -64,4 +64,4 @@ from .invite import WorkspaceInvitationsViewset
 
 from .sticky import StickyViewSet
 
-from .page import PageListAPIEndpoint
+from .page import PageListAPIEndpoint, PageDetailAPIEndpoint

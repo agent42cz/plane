@@ -64,3 +64,12 @@ class PageListAPIEndpoint(BaseAPIView):
                 pages, many=True, fields=self.fields, expand=self.expand
             ).data,
         )
+
+
+class PageDetailAPIEndpoint(PageListAPIEndpoint):
+    """Retrieve a single public page including its rendered HTML."""
+
+    def get(self, request, slug, project_id, pk):
+        page = self.get_queryset().get(pk=pk)
+        serializer = PageDetailSerializer(page)
+        return Response(serializer.data, status=status.HTTP_200_OK)
