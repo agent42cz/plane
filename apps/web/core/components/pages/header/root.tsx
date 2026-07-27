@@ -87,6 +87,7 @@ export const PagesListHeaderRoot = observer(function PagesListHeaderRoot(props: 
               filters={filters}
               handleFiltersUpdate={updateFilters}
               memberIds={workspaceMemberIds ?? undefined}
+              projectId={projectId}
             />
           </FiltersDropdown>
         </Header.RightItem>
@@ -98,6 +99,7 @@ export const PagesListHeaderRoot = observer(function PagesListHeaderRoot(props: 
             handleClearAllFilters={clearAllFilters}
             handleRemoveFilter={handleRemoveFilter}
             alwaysAllowEditing
+            projectId={projectId}
           />
         </Header>
       )}

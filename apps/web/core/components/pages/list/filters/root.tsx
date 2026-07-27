@@ -11,21 +11,26 @@ import type { TPageFilterProps, TPageFilters } from "@plane/types";
 // components
 import { FilterCreatedDate } from "@/components/common/filters/created-at";
 import { FilterCreatedBy } from "@/components/common/filters/created-by";
-import { FilterOption } from "@/components/issues/issue-layouts/filters";
+import { FilterLabels, FilterOption } from "@/components/issues/issue-layouts/filters";
+import { useLabel } from "@/hooks/store/use-label";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 
 type Props = {
   filters: TPageFilters;
   handleFiltersUpdate: <T extends keyof TPageFilters>(filterKey: T, filterValue: TPageFilters[T]) => void;
   memberIds?: string[] | undefined;
+  projectId: string;
 };
 
 export const PageFiltersSelection = observer(function PageFiltersSelection(props: Props) {
-  const { filters, handleFiltersUpdate, memberIds } = props;
+  const { filters, handleFiltersUpdate, memberIds, projectId } = props;
   // states
   const [filtersSearchQuery, setFiltersSearchQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const { isMobile } = usePlatformOS();
+  // store hooks
+  const { getProjectLabels } = useLabel();
+  const projectLabels = getProjectLabels(projectId);
 
   useEffect(() => {
     if (!isMobile && inputRef.current) {
@@ -106,6 +111,16 @@ export const PageFiltersSelection = observer(function PageFiltersSelection(props
             handleUpdate={(val) => handleFilters("created_by", val)}
             searchQuery={filtersSearchQuery}
             memberIds={memberIds}
+          />
+        </div>
+
+        {/* labels */}
+        <div className="py-2">
+          <FilterLabels
+            appliedFilters={filters.filters?.labels ?? null}
+            handleUpdate={(val) => handleFilters("labels", val)}
+            labels={projectLabels}
+            searchQuery={filtersSearchQuery}
           />
         </div>
       </div>
