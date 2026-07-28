@@ -14,7 +14,6 @@ import { getPageName } from "@plane/utils";
 import { ListItem } from "@/components/core/list";
 import { BlockItemAction } from "@/components/pages/list/block-item-action";
 // hooks
-import { useLabel } from "@/hooks/store/use-label";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // plane web hooks
 import type { EPageStoreType } from "@/hooks/store";
@@ -34,13 +33,11 @@ export const PageListBlock = observer(function PageListBlock(props: TPageListBlo
     pageId,
     storeType,
   });
-  const { getLabelById } = useLabel();
   const { isMobile } = usePlatformOS();
   // handle page check
   if (!page) return null;
   // derived values
-  const { name, logo_props, label_ids, getRedirectionLink } = page;
-  const pageLabels = (label_ids ?? []).map((labelId) => getLabelById(labelId)).filter((label) => !!label);
+  const { name, logo_props, getRedirectionLink } = page;
 
   return (
     <ListItem
@@ -54,26 +51,6 @@ export const PageListBlock = observer(function PageListBlock(props: TPageListBlo
         </>
       }
       title={getPageName(name)}
-      appendTitleElement={
-        pageLabels.length > 0 ? (
-          <span className="flex flex-shrink-0 items-center gap-1">
-            {pageLabels.map((label) => (
-              <span
-                key={label.id}
-                className="flex items-center gap-1 rounded-sm bg-layer-1 px-1.5 py-0.5 text-11 text-tertiary"
-              >
-                <span
-                  className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: label.color,
-                  }}
-                />
-                <span className="normal-case">{label.name}</span>
-              </span>
-            ))}
-          </span>
-        ) : undefined
-      }
       itemLink={getRedirectionLink()}
       actionableItems={<BlockItemAction page={page} parentRef={parentRef} storeType={storeType} />}
       isMobile={isMobile}
