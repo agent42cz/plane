@@ -38,6 +38,7 @@ export type TBasePage = TPage & {
   archive: (params: { shouldSync?: boolean; archived_at?: string | null }) => Promise<void>;
   restore: (params: { shouldSync?: boolean }) => Promise<void>;
   updatePageLogo: (value: TChangeHandlerProps) => Promise<void>;
+  updatePageLabels: (labelIds: string[]) => Promise<void>;
   addToFavorites: () => Promise<void>;
   removePageFromFavorites: () => Promise<void>;
   duplicate: () => Promise<TPage | undefined>;
@@ -183,6 +184,7 @@ export class BasePage extends ExtendedBasePage implements TBasePage {
       archive: action,
       restore: action,
       updatePageLogo: action,
+      updatePageLabels: action,
       addToFavorites: action,
       removePageFromFavorites: action,
       duplicate: action,
@@ -477,6 +479,28 @@ export class BasePage extends ExtendedBasePage implements TBasePage {
       console.error("Error in updating page logo", error);
       runInAction(() => {
         this.logo_props = originalLogoProps as TLogoProps;
+      });
+      throw error;
+    }
+  };
+
+  updatePageLabels = async (labelIds: string[]) => {
+    const previousLabelIds = this.label_ids ? [...this.label_ids] : undefined;
+    try {
+      runInAction(() => {
+        this.label_ids = labelIds;
+      });
+      // `labels` is a write-only field on PageSerializer; TPage only exposes `label_ids`.
+      const response = await this.services.update({ labels: labelIds } as unknown as Partial<TPage>);
+      if (response?.label_ids) {
+        runInAction(() => {
+          this.label_ids = response.label_ids;
+        });
+      }
+    } catch (error) {
+      console.error("Error in updating page labels", error);
+      runInAction(() => {
+        this.label_ids = previousLabelIds;
       });
       throw error;
     }
