@@ -312,6 +312,140 @@ git commit -m "feat(pages): Labels section in page Info panel"
 
 ---
 
+### Task 4: Named-chip trigger — shared `PageLabelSelect`
+
+**Why:** The default `IssueLabelSelect` trigger renders a "● N Labels" count pill (names hidden in a tooltip). The requirement is to SEE the tag names on the row. Wrap it in a shared component with a custom `label` node that renders named chips, and use it from both the list row and the Info panel.
+
+**Files:**
+
+- Create: `apps/web/core/components/pages/page-label-select.tsx`
+- Modify: `apps/web/core/components/pages/list/block-item-action.tsx` (use the wrapper, drop now-unused imports)
+- Modify: `apps/web/core/components/pages/navigation-pane/tab-panels/info/labels-info.tsx` (use the wrapper)
+
+**Interfaces:**
+
+- Produces: `PageLabelSelect({ labelIds: string[]; projectId: string | undefined; onChange: (labelIds: string[]) => void; disabled?: boolean })`. Renders named chips (first 2 + "+N") when non-empty, a "＋ Labels" affordance when empty+editable, and `null` when `disabled` and empty.
+- Consumes: `IssueLabelSelect` (`@/components/issues/select`), `useLabel().getLabelById`, `LabelPropertyIcon` (`@plane/propel/icons`).
+
+- [ ] **Step 1: Create `page-label-select.tsx`**
+
+```tsx
+/**
+ * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
+import { observer } from "mobx-react";
+import { LabelPropertyIcon } from "@plane/propel/icons";
+// components
+import { IssueLabelSelect } from "@/components/issues/select";
+// hooks
+import { useLabel } from "@/hooks/store/use-label";
+
+type Props = {
+  labelIds: string[];
+  projectId: string | undefined;
+  onChange: (labelIds: string[]) => void;
+  disabled?: boolean;
+};
+
+export const PageLabelSelect = observer(function PageLabelSelect(props: Props) {
+  const { labelIds, projectId, onChange, disabled = false } = props;
+  // store hooks
+  const { getLabelById } = useLabel();
+  // derived values
+  const labels = labelIds.map((labelId) => getLabelById(labelId)).filter((label) => !!label);
+  // read-only viewer with no labels: render nothing
+  if (disabled && labels.length === 0) return null;
+
+  return (
+    <IssueLabelSelect
+      value={labelIds}
+      projectId={projectId}
+      onChange={onChange}
+      disabled={disabled}
+      label={
+        labels.length > 0 ? (
+          <span className="flex flex-shrink-0 items-center gap-1">
+            {labels.slice(0, 2).map((label) => (
+              <span
+                key={label.id}
+                className="flex items-center gap-1 rounded-sm bg-layer-1 px-1.5 py-0.5 text-11 text-tertiary"
+              >
+                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: label.color }} />
+                <span className="normal-case">{label.name}</span>
+              </span>
+            ))}
+            {labels.length > 2 ? (
+              <span className="rounded-sm bg-layer-1 px-1.5 py-0.5 text-11 text-tertiary">+{labels.length - 2}</span>
+            ) : null}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 rounded-sm border-[0.5px] border-strong px-2 py-1 text-11 text-tertiary hover:bg-layer-1">
+            <LabelPropertyIcon className="h-3 w-3 flex-shrink-0" />
+            <span>Labels</span>
+          </span>
+        )
+      }
+    />
+  );
+});
+```
+
+- [ ] **Step 2: Use it in `block-item-action.tsx`**
+
+Replace the entire label block (the `{canCurrentUserEditPage ? <IssueLabelSelect …/> : …chips… : null}` conditional added in Task 2) with:
+
+```tsx
+{
+  /* labels */
+}
+<PageLabelSelect
+  labelIds={label_ids ?? []}
+  projectId={projectId}
+  onChange={(labelIds) => page.updatePageLabels(labelIds)}
+  disabled={!canCurrentUserEditPage}
+/>;
+```
+
+Then fix imports: remove `import { IssueLabelSelect } from "@/components/issues/select";`, remove `import { useLabel } from "@/hooks/store/use-label";`, remove the `const { getLabelById } = useLabel();` line (all now unused), and add `import { PageLabelSelect } from "@/components/pages/page-label-select";`. Keep the `canCurrentUserEditPage`, `label_ids`, `project_ids` destructure and `const projectId = project_ids?.[0];`.
+
+- [ ] **Step 3: Use it in `labels-info.tsx`**
+
+Replace `import { IssueLabelSelect } from "@/components/issues/select";` with `import { PageLabelSelect } from "@/components/pages/page-label-select";`, and replace the `<IssueLabelSelect … />` element with:
+
+```tsx
+<PageLabelSelect
+  labelIds={label_ids ?? []}
+  projectId={projectId}
+  onChange={(labelIds) => page.updatePageLabels(labelIds)}
+  disabled={!canCurrentUserEditPage}
+/>
+```
+
+Keep the existing early-return guard and the "Labels" heading exactly as they are.
+
+- [ ] **Step 4: Type-check**
+
+Run: `cd /home/dev/plane && npx turbo run check:types --filter=web`
+Expected: PASS (0 errors). The `getLabelById(...).filter((label) => !!label)` pattern is the same one already used and type-checked in `block.tsx`/`block-item-action.tsx`.
+
+- [ ] **Step 5: Lint**
+
+Run: `cd /home/dev/plane && npx turbo run check:lint --filter=web`
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+cd /home/dev/plane
+git add apps/web/core/components/pages/page-label-select.tsx apps/web/core/components/pages/list/block-item-action.tsx apps/web/core/components/pages/navigation-pane/tab-panels/info/labels-info.tsx
+git commit -m "feat(pages): show named label chips on the row/Info trigger"
+```
+
+---
+
 ## Final verification (after all tasks)
 
 - [ ] `cd /home/dev/plane && npx turbo run check:types --filter=web` — clean

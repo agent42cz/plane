@@ -32,10 +32,12 @@ Dokumenty. No portal change needed.
 
 - **`IssueLabelSelect`** (`apps/web/core/components/issues/select`, via `WorkItemLabelSelectBase`)
   — multi-select label dropdown. Props of interest: `value: string[]`, `onChange:(string[])=>void`,
-  `projectId`, `disabled`, `label?` (custom trigger). Its trigger renders selected labels as chips
-  (`IssueLabelsList`, max 3 + count) when non-empty, and a bordered "Labels" button when empty.
-  Its click handler calls `stopPropagation`/`preventDefault`, so it is safe inside a clickable row.
-  Same component the import modal already uses.
+  `projectId`, `disabled`, `label?` (custom trigger node — overrides the default trigger entirely).
+  Its **default** non-empty trigger (`IssueLabelsList`) renders only a "● N Labels" **count pill**
+  (names in a tooltip), which hides the tag names — so we pass a custom `label` node that renders the
+  actual **named chips** (colored dot + name), matching today's "•SPLY" chip. Its click handler calls
+  `stopPropagation`/`preventDefault`, so it is safe inside a clickable row. Same component the import
+  modal already uses. Wrapped by a shared `PageLabelSelect` (see Design §4).
 - **`page.updatePageLogo`** (`apps/web/core/store/pages/base-page.ts`) — the optimistic-update
   pattern to mirror for a new `updatePageLabels`.
 - **`canCurrentUserEditPage`** — permission flag already on the page instance; gates editability.
@@ -65,6 +67,15 @@ Add a **Labels** section to `navigation-pane/tab-panels/info/root.tsx` (a siblin
 Document-info / Actors-info sections), using the same `IssueLabelSelect` wired to
 `page.updatePageLabels`, gated on `canCurrentUserEditPage`. New component
 `navigation-pane/tab-panels/info/labels-info.tsx` for parity with the existing `*-info.tsx` files.
+
+### 4. Shared `PageLabelSelect` with named-chip trigger
+
+Wrap `IssueLabelSelect` in `apps/web/core/components/pages/page-label-select.tsx`: resolve
+`labelIds` via `useLabel().getLabelById` and pass a custom `label` node that renders **named chips**
+(colored dot + name, first 2 + "+N" overflow) when non-empty, and a bordered "＋ Labels" affordance
+(`LabelPropertyIcon`) when empty and editable. Returns `null` when `disabled` and empty. Both the list
+row (§2) and the Info panel (§3) use this one component, so the read-only and editable states share a
+single trigger appearance.
 
 ## Non-goals
 
