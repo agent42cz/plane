@@ -6,7 +6,7 @@
 
 import { observer } from "mobx-react";
 // components
-import { IssueLabelSelect } from "@/components/issues/select";
+import { PageLabelSelect } from "@/components/pages/page-label-select";
 // store
 import type { TPageInstance } from "@/store/pages/base-page";
 
@@ -26,8 +26,8 @@ export const PageNavigationPaneInfoTabLabelsInfo = observer(function PageNavigat
     <div className="mt-4">
       <p className="text-11 font-medium text-tertiary">Labels</p>
       <div className="mt-2">
-        <IssueLabelSelect
-          value={label_ids ?? []}
+        <PageLabelSelect
+          labelIds={label_ids ?? []}
           projectId={projectId}
           onChange={(labelIds) => page.updatePageLabels(labelIds)}
           disabled={!canCurrentUserEditPage}

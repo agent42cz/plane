@@ -12,10 +12,9 @@ import { Tooltip } from "@plane/propel/tooltip";
 import { Avatar, FavoriteStar } from "@plane/ui";
 import { renderFormattedDate, getFileURL } from "@plane/utils";
 // components
-import { IssueLabelSelect } from "@/components/issues/select";
+import { PageLabelSelect } from "@/components/pages/page-label-select";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
-import { useLabel } from "@/hooks/store/use-label";
 import { usePageOperations } from "@/hooks/use-page-operations";
 // plane web hooks
 import type { EPageStoreType } from "@/hooks/store";
@@ -34,7 +33,6 @@ export const BlockItemAction = observer(function BlockItemAction(props: Props) {
   const { page, parentRef, storeType } = props;
   // store hooks
   const { getUserDetails } = useMember();
-  const { getLabelById } = useLabel();
   // page operations
   const { pageOperations } = usePageOperations({
     page,
@@ -55,29 +53,13 @@ export const BlockItemAction = observer(function BlockItemAction(props: Props) {
 
   return (
     <>
-      {/* labels — editable for members, read-only chips otherwise */}
-      {canCurrentUserEditPage ? (
-        <IssueLabelSelect
-          value={label_ids ?? []}
-          projectId={projectId}
-          onChange={(labelIds) => page.updatePageLabels(labelIds)}
-        />
-      ) : label_ids && label_ids.length > 0 ? (
-        <span className="flex flex-shrink-0 items-center gap-1">
-          {label_ids
-            .map((labelId) => getLabelById(labelId))
-            .filter((label) => !!label)
-            .map((label) => (
-              <span
-                key={label.id}
-                className="flex items-center gap-1 rounded-sm bg-layer-1 px-1.5 py-0.5 text-11 text-tertiary"
-              >
-                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: label.color }} />
-                <span className="normal-case">{label.name}</span>
-              </span>
-            ))}
-        </span>
-      ) : null}
+      {/* labels */}
+      <PageLabelSelect
+        labelIds={label_ids ?? []}
+        projectId={projectId}
+        onChange={(labelIds) => page.updatePageLabels(labelIds)}
+        disabled={!canCurrentUserEditPage}
+      />
       {/* page details */}
       <div className="cursor-default">
         <Tooltip tooltipHeading="Owned by" tooltipContent={ownerDetails?.display_name}>
