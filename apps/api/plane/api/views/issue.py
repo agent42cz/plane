@@ -2050,13 +2050,13 @@ class IssueDescriptionAssetListAPIEndpoint(BaseAPIView):
         storage = S3Storage(request=request)
         assets = [
             {
+                # the id as it appears in description_html, so a client can match an
+                # <image-component src="..."> back to the file it points at
                 "asset_id": str(asset.id),
                 "asset_name": asset.attributes.get("name", ""),
                 "asset_type": asset.attributes.get("type", ""),
                 "size": asset.size,
                 "created_at": asset.created_at,
-                # the id as it appears in description_html, so a client can match an
-                # <image-component src="..."> back to the file it points at
                 "asset_url": storage.generate_presigned_url(
                     object_name=asset.asset.name,
                     filename=asset.attributes.get("name"),
