@@ -45,6 +45,10 @@ class TestIsAllowedAttachmentMime:
     def test_allows_a_type_carrying_a_charset_parameter(self):
         assert is_allowed_attachment_mime("text/csv; charset=utf-8") is True
 
+    def test_allows_the_ole2_container_of_a_legacy_xls(self):
+        """Signature sniffers report a plain .xls as its OLE2 wrapper and nothing more."""
+        assert is_allowed_attachment_mime("application/x-cfb") is True
+
     @pytest.mark.parametrize("value", ["", None, False])
     def test_rejects_a_missing_type(self, value):
         assert is_allowed_attachment_mime(value) is False

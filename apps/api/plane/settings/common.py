@@ -496,6 +496,11 @@ ATTACHMENT_MIME_TYPES = [
     "application/vnd.oasis.opendocument.graphics",
     # Microsoft Visio
     "application/vnd.visio",
+    # OLE2 compound file — the container every legacy .xls/.doc/.ppt/.msg is wrapped in.
+    # Signature sniffers report the wrapper rather than the document, so a plain .xls
+    # arrives as this and nothing more specific; the documents themselves are already
+    # allowed above, so accepting the container adds no file type that was not allowed.
+    "application/x-cfb",
     # Netpbm format
     "image/x-portable-graymap",
     "image/x-portable-bitmap",

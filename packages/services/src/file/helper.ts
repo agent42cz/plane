@@ -82,6 +82,12 @@ const detectMimeTypeFromSignature = async (file: File): Promise<string> => {
 };
 
 /**
+ * Wrapper formats that carry no information about what the file actually is:
+ * OLE2 compound files (.xls/.doc/.ppt/.msg) and zip archives (every OOXML document).
+ */
+const GENERIC_CONTAINER_TYPES = new Set(["application/x-cfb", "application/zip"]);
+
+/**
  * @description Validate and detect the MIME type of a file using signature detection
  * Also performs basic security checks on filename
  * @param {File} file
@@ -96,7 +102,12 @@ const validateAndDetectFileType = async (file: File): Promise<string> => {
 
   try {
     const signatureType = await detectMimeTypeFromSignature(file);
-    if (signatureType) {
+    // A signature can only identify the *container*, which for Office documents says
+    // almost nothing: every legacy .xls/.doc/.ppt is an OLE2 compound file, and every
+    // .xlsx/.docx (or one whose header did not fit in the sampled bytes) is a zip. The
+    // browser's own type, derived from the extension, is the more specific of the two
+    // and the one worth storing — so let it win for those two wrapper formats only.
+    if (signatureType && !(GENERIC_CONTAINER_TYPES.has(signatureType) && file.type)) {
       return signatureType;
     }
   } catch (_error) {
