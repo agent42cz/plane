@@ -159,6 +159,11 @@ from plane.utils.openapi import (
     WORKSPACE_NOT_FOUND_RESPONSE,
 )
 from plane.bgtasks.work_item_link_task import crawl_work_item_link_title
+from plane.utils.mime import (
+    invalid_attachment_type_error,
+    is_allowed_attachment_mime,
+    log_attachment_type_rejection,
+)
 
 
 def user_has_issue_permission(user_id, project_id, issue=None, allowed_roles=None, allow_creator=True):
@@ -1912,9 +1917,10 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
 
         size_limit = min(size, settings.FILE_SIZE_LIMIT)
 
-        if not type or type not in settings.ATTACHMENT_MIME_TYPES:
+        if not is_allowed_attachment_mime(type):
+            log_attachment_type_rejection(name=name, mime_type=type)
             return Response(
-                {"error": "Invalid file type.", "status": False},
+                invalid_attachment_type_error(type),
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -2013,6 +2019,52 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
         # Serialize the attachments
         serializer = IssueAttachmentSerializer(issue_attachments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class IssueDescriptionAssetListAPIEndpoint(BaseAPIView):
+    """Work item description asset list endpoint.
+
+    Pictures pasted into a work item's description are stored as file assets and
+    referenced from ``description_html`` by asset id -- ``<image-component src="{id}">``
+    -- rather than by URL. An API or MCP client could therefore read the description
+    text but had no way to reach the pictures in it: the assets are not attachments,
+    so they never appear in the attachment listing. This returns them with a
+    presigned download URL each.
+    """
+
+    model = FileAsset
+    permission_classes = [ProjectEntityPermission]
+    use_read_replica = True
+
+    def get(self, request, slug, project_id, issue_id):
+        """List the assets embedded in a work item's description."""
+        description_assets = FileAsset.objects.filter(
+            issue_id=issue_id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
+            workspace__slug=slug,
+            project_id=project_id,
+            is_uploaded=True,
+            is_deleted=False,
+        )
+
+        storage = S3Storage(request=request)
+        assets = [
+            {
+                "asset_id": str(asset.id),
+                "asset_name": asset.attributes.get("name", ""),
+                "asset_type": asset.attributes.get("type", ""),
+                "size": asset.size,
+                "created_at": asset.created_at,
+                # the id as it appears in description_html, so a client can match an
+                # <image-component src="..."> back to the file it points at
+                "asset_url": storage.generate_presigned_url(
+                    object_name=asset.asset.name,
+                    filename=asset.attributes.get("name"),
+                ),
+            }
+            for asset in description_assets
+        ]
+        return Response(assets, status=status.HTTP_200_OK)
 
 
 class IssueAttachmentDetailAPIEndpoint(BaseAPIView):

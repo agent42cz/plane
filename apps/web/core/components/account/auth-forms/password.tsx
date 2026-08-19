@@ -81,6 +81,55 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
     }
   }, [csrfPromise]);
 
+  // Password managers (1Password, Bitwarden, browser autofill) fill a field by writing
+  // `input.value` directly. React keeps its own value tracker, so a direct write followed
+  // by a plain `input` event never reaches React state: the submit button stays disabled
+  // and the hidden `email` field this form actually submits stays empty. Native listeners
+  // on the form see those events regardless of React's tracker, so sync state from the DOM.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+
+    const readField = (name: keyof TPasswordFormValues) =>
+      form.querySelector<HTMLInputElement>(`input[name="${name === "email" ? "username" : name}"]`) ??
+      form.querySelector<HTMLInputElement>(`#${name === "confirm_password" ? "confirm-password" : name}`);
+
+    const syncField = (key: keyof TPasswordFormValues, value: string) =>
+      setPasswordFormData((prev) => (prev[key] === value ? prev : { ...prev, [key]: value }));
+
+    const syncFromEvent = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      // the visible email input is named `username` in combined mode (see below)
+      const key = target.name === "username" ? "email" : target.name;
+      if (key !== "email" && key !== "password" && key !== "confirm_password") return;
+      syncField(key, target.value);
+    };
+
+    // a filler may have written the fields before this effect attached
+    for (const key of ["email", "password", "confirm_password"] as const) {
+      const field = readField(key);
+      if (field && field.value) syncField(key, field.value);
+    }
+
+    form.addEventListener("input", syncFromEvent);
+    form.addEventListener("change", syncFromEvent);
+    return () => {
+      form.removeEventListener("input", syncFromEvent);
+      form.removeEventListener("change", syncFromEvent);
+    };
+  }, []);
+
+  // Last-resort backstop for fillers that write values without firing any event at all:
+  // the form submits the hidden `email` input, so copy the visible field into it on submit.
+  const handleHiddenEmailSync = () => {
+    const form = formRef.current;
+    if (!form) return;
+    const visibleEmail = form.querySelector<HTMLInputElement>("#email");
+    const hiddenEmail = form.querySelector<HTMLInputElement>('input[type="hidden"][name="email"]');
+    if (visibleEmail && hiddenEmail && visibleEmail.value) hiddenEmail.value = visibleEmail.value;
+  };
+
   const redirectToUniqueCodeSignIn = async () => {
     handleAuthStep(EAuthSteps.UNIQUE_CODE);
   };
@@ -115,7 +164,14 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
       (mode === EAuthModes.SIGN_UP ? passwordFormData.password === passwordFormData.confirm_password : true)
         ? false
         : true,
-    [isSubmitting, mode, emailEditable, passwordFormData.email, passwordFormData.confirm_password, passwordFormData.password]
+    [
+      isSubmitting,
+      mode,
+      emailEditable,
+      passwordFormData.email,
+      passwordFormData.confirm_password,
+      passwordFormData.password,
+    ]
   );
 
   const password = passwordFormData?.password ?? "";
@@ -157,6 +213,7 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
         onSubmit={async (event) => {
           event.preventDefault(); // Prevent form from submitting by default
           await handleCSRFToken();
+          handleHiddenEmailSync();
           const isPasswordValid =
             mode === EAuthModes.SIGN_UP
               ? getPasswordStrength(passwordFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID

@@ -103,8 +103,17 @@ const validateAndDetectFileType = async (file: File): Promise<string> => {
     console.warn("Error detecting file type from signature:", _error);
   }
 
-  // fallback for unknown files
-  return "";
+  // Signature detection only recognises files with a distinctive magic-byte header, so it
+  // returns nothing for text-based payloads — including the CSV/HTML exports that accounting
+  // and ERP tools hand out under an .xlsx/.xls name. Returning "" here made the server reject
+  // the upload with "Invalid file type", even for types that are on its allowlist. Fall back
+  // to the browser's own MIME (derived from the extension) before giving up.
+  if (file.type) {
+    return file.type;
+  }
+
+  // an unnamed/extension-less file: let the server's allowlist decide
+  return "application/octet-stream";
 };
 
 /**

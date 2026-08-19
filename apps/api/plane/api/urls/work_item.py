@@ -14,6 +14,7 @@ from plane.api.views import (
     IssueActivityListAPIEndpoint,
     IssueActivityDetailAPIEndpoint,
     IssueAttachmentListCreateAPIEndpoint,
+    IssueDescriptionAssetListAPIEndpoint,
     IssueAttachmentDetailAPIEndpoint,
     WorkspaceIssueAPIEndpoint,
     IssueSearchEndpoint,
@@ -145,6 +146,11 @@ new_url_patterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/work-items/<uuid:issue_id>/attachments/<uuid:pk>/",
         IssueAttachmentDetailAPIEndpoint.as_view(http_method_names=["get", "patch", "delete"]),
         name="work-item-attachment-detail",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/work-items/<uuid:issue_id>/description-assets/",
+        IssueDescriptionAssetListAPIEndpoint.as_view(http_method_names=["get"]),
+        name="work-item-description-asset-list",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/work-items/<uuid:issue_id>/relations/",

@@ -27,6 +27,11 @@ from plane.settings.storage import S3Storage
 from plane.utils.path_validator import sanitize_filename
 from plane.bgtasks.storage_metadata_task import get_asset_object_metadata
 from plane.utils.host import base_host
+from plane.utils.mime import (
+    invalid_attachment_type_error,
+    is_allowed_attachment_mime,
+    log_attachment_type_rejection,
+)
 
 
 class IssueAttachmentEndpoint(BaseAPIView):
@@ -102,9 +107,10 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
         type = request.data.get("type", False)
         size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
 
-        if not type or type not in settings.ATTACHMENT_MIME_TYPES:
+        if not is_allowed_attachment_mime(type):
+            log_attachment_type_rejection(name=name, mime_type=type)
             return Response(
-                {"error": "Invalid file type.", "status": False},
+                invalid_attachment_type_error(type),
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

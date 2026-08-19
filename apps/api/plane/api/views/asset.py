@@ -45,6 +45,11 @@ from plane.utils.openapi import (
     asset_docs,
 )
 from plane.utils.exception_logger import log_exception
+from plane.utils.mime import (
+    invalid_attachment_type_error,
+    is_allowed_attachment_mime,
+    log_attachment_type_rejection,
+)
 
 
 class UserAssetEndpoint(BaseAPIView):
@@ -535,9 +540,10 @@ class GenericAssetEndpoint(BaseAPIView):
         size_limit = min(size, settings.FILE_SIZE_LIMIT)
 
         # Check if the file type is allowed
-        if not type or type not in settings.ATTACHMENT_MIME_TYPES:
+        if not is_allowed_attachment_mime(type):
+            log_attachment_type_rejection(name=name, mime_type=type)
             return Response(
-                {"error": "Invalid file type.", "status": False},
+                invalid_attachment_type_error(type),
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
