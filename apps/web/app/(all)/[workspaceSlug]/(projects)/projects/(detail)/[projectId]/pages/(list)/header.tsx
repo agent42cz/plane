@@ -23,7 +23,7 @@ import { ImportMarkdownModal } from "@/components/pages/modals/import-markdown-m
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 // plane web imports
-import { CommonProjectBreadcrumbs } from "@/plane-web/components/breadcrumbs/common";
+import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
 import { EPageStoreType, usePageStore } from "@/hooks/store";
 
 export const PagesListHeader = observer(function PagesListHeader() {
@@ -47,6 +47,7 @@ export const PagesListHeader = observer(function PagesListHeader() {
     };
 
     await createPage(payload)
+      // oxlint-disable-next-line promise/always-return
       .then((res) => {
         const pageId = `/${workspaceSlug}/projects/${currentProjectDetails?.id}/pages/${res?.id}`;
         return router.push(pageId);
