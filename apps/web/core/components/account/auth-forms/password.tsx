@@ -73,6 +73,8 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
 
   const handleFormChange = (key: keyof TPasswordFormValues, value: string) =>
     setPasswordFormData((prev) => ({ ...prev, [key]: value }));
+  // combined login: start in the email field unless it was pre-filled (e.g. ?email= link)
+  const focusEmail = emailEditable && !email;
 
   useEffect(() => {
     if (csrfPromise === undefined) {
@@ -83,16 +85,20 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
 
   // Password managers (1Password, Bitwarden, browser autofill) fill a field by writing
   // `input.value` directly. React keeps its own value tracker, so a direct write followed
-  // by a plain `input` event never reaches React state: the submit button stays disabled
-  // and the hidden `email` field this form actually submits stays empty. Native listeners
-  // on the form see those events regardless of React's tracker, so sync state from the DOM.
+  // by a plain `input` event never reaches React state and the submit button stays
+  // disabled. Native listeners on the form see those events regardless of React's
+  // tracker, so sync state from the DOM.
   useEffect(() => {
     const form = formRef.current;
     if (!form) return;
 
-    const readField = (name: keyof TPasswordFormValues) =>
-      form.querySelector<HTMLInputElement>(`input[name="${name === "email" ? "username" : name}"]`) ??
-      form.querySelector<HTMLInputElement>(`#${name === "confirm_password" ? "confirm-password" : name}`);
+    // visible inputs by id; the hidden inputs carry no id and are never filled
+    const fieldIds: Record<keyof TPasswordFormValues, string> = {
+      email: "email",
+      password: "password",
+      confirm_password: "confirm-password",
+    };
+    const fieldKeys = Object.keys(fieldIds) as (keyof TPasswordFormValues)[];
 
     const syncField = (key: keyof TPasswordFormValues, value: string) =>
       setPasswordFormData((prev) => (prev[key] === value ? prev : { ...prev, [key]: value }));
@@ -100,15 +106,13 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
     const syncFromEvent = (event: Event) => {
       const target = event.target;
       if (!(target instanceof HTMLInputElement)) return;
-      // the visible email input is named `username` in combined mode (see below)
-      const key = target.name === "username" ? "email" : target.name;
-      if (key !== "email" && key !== "password" && key !== "confirm_password") return;
-      syncField(key, target.value);
+      const key = fieldKeys.find((k) => fieldIds[k] === target.id);
+      if (key) syncField(key, target.value);
     };
 
     // a filler may have written the fields before this effect attached
-    for (const key of ["email", "password", "confirm_password"] as const) {
-      const field = readField(key);
+    for (const key of fieldKeys) {
+      const field = form.querySelector<HTMLInputElement>(`#${fieldIds[key]}`);
       if (field && field.value) syncField(key, field.value);
     }
 
@@ -119,16 +123,6 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
       form.removeEventListener("change", syncFromEvent);
     };
   }, []);
-
-  // Last-resort backstop for fillers that write values without firing any event at all:
-  // the form submits the hidden `email` input, so copy the visible field into it on submit.
-  const handleHiddenEmailSync = () => {
-    const form = formRef.current;
-    if (!form) return;
-    const visibleEmail = form.querySelector<HTMLInputElement>("#email");
-    const hiddenEmail = form.querySelector<HTMLInputElement>('input[type="hidden"][name="email"]');
-    if (visibleEmail && hiddenEmail && visibleEmail.value) hiddenEmail.value = visibleEmail.value;
-  };
 
   const redirectToUniqueCodeSignIn = async () => {
     handleAuthStep(EAuthSteps.UNIQUE_CODE);
@@ -158,6 +152,7 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
 
   const isButtonDisabled = useMemo(
     () =>
+      // oxlint-disable-next-line no-unneeded-ternary
       !isSubmitting &&
       !!passwordFormData.password &&
       (emailEditable ? !!passwordFormData.email : true) &&
@@ -207,13 +202,13 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
       )}
       <form
         ref={formRef}
+        id={mode === EAuthModes.SIGN_IN ? "sign-in-form" : "sign-up-form"}
         className="space-y-4"
         method="POST"
         action={`${API_BASE_URL}/auth/${mode === EAuthModes.SIGN_IN ? "sign-in" : "sign-up"}/`}
         onSubmit={async (event) => {
           event.preventDefault(); // Prevent form from submitting by default
           await handleCSRFToken();
-          handleHiddenEmailSync();
           const isPasswordValid =
             mode === EAuthModes.SIGN_UP
               ? getPasswordStrength(passwordFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID
@@ -230,7 +225,7 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
         }}
       >
         <input type="hidden" name="csrfmiddlewaretoken" />
-        <input type="hidden" value={passwordFormData.email} name="email" />
+        {!emailEditable && <input type="hidden" value={passwordFormData.email} name="email" />}
         {nextPath && <input type="hidden" value={nextPath} name="next_path" />}
         <div className="space-y-1">
           <label htmlFor="email" className="text-13 font-medium text-tertiary">
@@ -239,18 +234,16 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
           <div className={`relative flex items-center rounded-md border border-strong bg-surface-1`}>
             <Input
               id="email"
-              // In combined mode use a plain username field (not type=email / name=email) so the
-              // browser's own email-history dropdown doesn't hijack the field and hide 1Password's
-              // login suggestion. The value is still submitted via the hidden `email` field above.
-              name={emailEditable ? "username" : "email"}
-              type={emailEditable ? "text" : "email"}
-              inputMode="email"
+              name="email"
+              type="email"
               value={passwordFormData.email}
               onChange={(e) => handleFormChange("email", e.target.value)}
               placeholder={t("auth.common.email.placeholder")}
               className={`h-10 w-full border-0 disable-autofill-style placeholder:text-placeholder`}
               autoComplete="username"
               disabled={!emailEditable}
+              // oxlint-disable-next-line jsx_a11y/no-autofocus
+              autoFocus={focusEmail}
             />
             {passwordFormData.email.length > 0 && (
               <button
@@ -281,7 +274,8 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
               onFocus={() => setIsPasswordInputFocused(true)}
               onBlur={() => setIsPasswordInputFocused(false)}
               autoComplete={mode === EAuthModes.SIGN_IN ? "current-password" : "new-password"}
-              autoFocus
+              // oxlint-disable-next-line jsx_a11y/no-autofocus
+              autoFocus={!focusEmail}
             />
             <button
               type="button"
