@@ -5,6 +5,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Script from "next/script";
 import { Links, Meta, Outlet, Scripts } from "react-router";
 import type { LinksFunction } from "react-router";
@@ -136,9 +137,19 @@ export default function Root() {
 
 export function HydrateFallback() {
   const { resolvedTheme } = useTheme();
+  // SPA mode prerenders index.html in Node, where resolvedTheme is undefined, so the
+  // prerendered fallback is an empty <div>. next-themes resolves the theme synchronously on
+  // the client, so without this gate the first client render shows the spinner instead — a
+  // structural mismatch. Since the app hydrates the whole document (hydrateRoot(document)),
+  // that mismatch fails hydration for the entire page ("server HTML was replaced with client
+  // content in #document"), so React throws away the server DOM and re-renders it, taking with
+  // it anything a browser extension (e.g. 1Password's autofill UI) attached to it. Render the
+  // same empty <div> on the first client render, then reveal the spinner after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  // if we are on the server or the theme is not resolved, return an empty div
-  if (typeof window === "undefined" || resolvedTheme === undefined) return <div />;
+  // if we are on the server, not yet mounted, or the theme is not resolved, return an empty div
+  if (typeof window === "undefined" || !mounted || resolvedTheme === undefined) return <div />;
 
   return (
     <div className="relative flex h-screen w-full items-center justify-center bg-canvas">
