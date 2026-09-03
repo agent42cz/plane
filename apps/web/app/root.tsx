@@ -137,6 +137,7 @@ export default function Root() {
 
 export function HydrateFallback() {
   const { resolvedTheme } = useTheme();
+  // See docs/superpowers/notes/2026-09-03-1password-signin-hydration.md for the full write-up.
   // SPA mode prerenders index.html in Node, where resolvedTheme is undefined, so the
   // prerendered fallback is an empty <div>. next-themes resolves the theme synchronously on
   // the client, so without this gate the first client render shows the spinner instead — a
