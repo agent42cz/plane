@@ -128,14 +128,12 @@ class TestPagesPublicListAPI:
         assert resp_a.status_code == status.HTTP_200_OK
         assert {p["name"] for p in resp_a.data["results"]} == {"Shared Doc"}
 
-        # Must be absent under B's list URL (user is not a member of B).
+        # B's URLs are denied outright: ProjectMemberPermission requires membership of the URL project.
         resp_b = api_key_client.get(list_url(workspace.slug, project_b.id))
-        assert resp_b.status_code == status.HTTP_200_OK
-        assert page.id not in {p["id"] for p in resp_b.data["results"]}
+        assert resp_b.status_code == status.HTTP_403_FORBIDDEN
 
-        # Retrieve under B's URL must 404.
         detail_resp_b = api_key_client.get(detail_url(workspace.slug, project_b.id, page.id))
-        assert detail_resp_b.status_code == status.HTTP_404_NOT_FOUND
+        assert detail_resp_b.status_code == status.HTTP_403_FORBIDDEN
 
 
 def detail_url(slug, pid, pk):
