@@ -11,6 +11,7 @@ from rest_framework.response import Response
 
 from plane.api.serializers import PageSerializer, PageDetailSerializer
 from plane.api.views.base import BaseAPIView
+from plane.api.views.issue import is_restricted_guest
 from plane.app.permissions import ProjectMemberPermission
 from plane.db.models import Page
 
@@ -24,15 +25,25 @@ class PageListAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
-        return (
-            Page.objects.filter(workspace__slug=self.kwargs.get("slug"))
+        slug = self.kwargs.get("slug")
+        project_id = self.kwargs.get("project_id")
+        queryset = (
+            Page.objects.filter(workspace__slug=slug)
             .filter(
-                projects__id=self.kwargs.get("project_id"),
+                projects__id=project_id,
                 projects__project_projectmember__member=self.request.user,
                 projects__project_projectmember__is_active=True,
                 projects__archived_at__isnull=True,
             )
+            # an active ProjectPage link, like ProjectPagePermission requires in the app
+            .filter(project_pages__project_id=project_id, project_pages__deleted_at__isnull=True)
             .filter(access=0, archived_at__isnull=True)
+        )
+        # guests without guest_view_all_features see only their own pages, as in the app
+        if is_restricted_guest(self.request.user.id, project_id, slug):
+            queryset = queryset.filter(owned_by=self.request.user)
+        return (
+            queryset
             .annotate(
                 label_ids=Coalesce(
                     ArrayAgg(

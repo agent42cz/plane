@@ -6,7 +6,9 @@ import pytest
 from django.utils import timezone
 from rest_framework import status
 
-from plane.db.models import Page, ProjectPage, Project, ProjectMember
+from uuid import uuid4
+
+from plane.db.models import APIToken, Page, ProjectPage, Project, ProjectMember, User, WorkspaceMember
 
 
 @pytest.fixture
@@ -155,3 +157,60 @@ class TestPagesPublicRetrieveAPI:
         page = make_page(project, create_user, "Secret", access=1)
         resp = api_key_client.get(detail_url(workspace.slug, project.id, page.id))
         assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def make_guest_client(api_client, workspace, project):
+    """An API client for an active GUEST (role=5) of ``project``."""
+    unique_id = uuid4().hex[:8]
+    guest = User.objects.create(email=f"guest-{unique_id}@plane.so", username=f"guest_{unique_id}")
+    WorkspaceMember.objects.create(workspace=workspace, member=guest, role=5)
+    ProjectMember.objects.create(project=project, member=guest, workspace=workspace, role=5, is_active=True)
+    token = APIToken.objects.create(user=guest, label="Guest Token")
+    api_client.credentials(HTTP_X_API_KEY=token.token)
+    return api_client, guest
+
+
+@pytest.mark.contract
+class TestPagesPublicGuestScope:
+    """Mirrors ProjectPagePermission in the app: a guest on a project without
+    guest_view_all_features only sees the pages they own."""
+
+    @pytest.mark.django_db
+    def test_restricted_guest_sees_only_own_pages(self, api_client, workspace, project, create_user):
+        client, guest = make_guest_client(api_client, workspace, project)
+        foreign = make_page(project, create_user, "Admin Doc", access=0)
+        make_page(project, guest, "Guest Doc", access=0)
+
+        resp = client.get(list_url(workspace.slug, project.id))
+        assert resp.status_code == status.HTTP_200_OK
+        assert {p["name"] for p in resp.data["results"]} == {"Guest Doc"}
+
+        detail = client.get(detail_url(workspace.slug, project.id, foreign.id))
+        assert detail.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.django_db
+    def test_guest_with_view_all_sees_all_public_pages(self, api_client, workspace, project, create_user):
+        project.guest_view_all_features = True
+        project.save(update_fields=["guest_view_all_features"])
+        client, guest = make_guest_client(api_client, workspace, project)
+        make_page(project, create_user, "Admin Doc", access=0)
+        make_page(project, guest, "Guest Doc", access=0)
+
+        resp = client.get(list_url(workspace.slug, project.id))
+        assert resp.status_code == status.HTTP_200_OK
+        assert {p["name"] for p in resp.data["results"]} == {"Admin Doc", "Guest Doc"}
+
+
+@pytest.mark.contract
+class TestPagesPublicRemovedProjectLink:
+    @pytest.mark.django_db
+    def test_page_removed_from_project_is_hidden(self, api_key_client, workspace, project, create_user):
+        page = make_page(project, create_user, "Removed Doc", access=0)
+        ProjectPage.objects.filter(project=project, page=page).update(deleted_at=timezone.now())
+
+        resp = api_key_client.get(list_url(workspace.slug, project.id))
+        assert resp.status_code == status.HTTP_200_OK
+        assert page.id not in {p["id"] for p in resp.data["results"]}
+
+        detail = api_key_client.get(detail_url(workspace.slug, project.id, page.id))
+        assert detail.status_code == status.HTTP_404_NOT_FOUND

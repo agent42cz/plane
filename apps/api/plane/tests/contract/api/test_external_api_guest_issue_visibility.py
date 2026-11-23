@@ -1599,3 +1599,33 @@ class TestIntakeIssueDeleteScope:
         response = api_key_client.delete(_intake_issue_detail_url(workspace, project, foreign_issue))
         assert response.status_code == status.HTTP_204_NO_CONTENT, f"Got {response.status_code}: {response.data!r}"
         assert not IntakeIssue.objects.filter(pk=foreign_intake_issue.pk).exists()
+
+
+# ---------------------------------------------------------------------------
+# Fork: description assets -- IssueDescriptionAssetListAPIEndpoint.get
+# ---------------------------------------------------------------------------
+
+
+def _description_assets_url(workspace, project, issue):
+    return f"/api/v1/workspaces/{workspace.slug}/projects/{project.id}/work-items/{issue.id}/description-assets/"
+
+
+@pytest.mark.contract
+class TestWorkItemDescriptionAssetsGuestScope:
+    @pytest.mark.django_db
+    def test_guest_denied_description_assets_on_foreign_issue(self, guest_client, workspace, project, foreign_issue):
+        response = guest_client.get(_description_assets_url(workspace, project, foreign_issue))
+        assert response.status_code == status.HTTP_404_NOT_FOUND, f"Got {response.status_code}: {response.data!r}"
+
+    @pytest.mark.django_db
+    def test_guest_allowed_description_assets_on_own_issue(self, guest_client, workspace, project, own_issue):
+        response = guest_client.get(_description_assets_url(workspace, project, own_issue))
+        assert response.status_code == status.HTTP_200_OK, f"Got {response.status_code}: {response.data!r}"
+
+    @pytest.mark.django_db
+    def test_guest_with_view_all_allowed_description_assets_on_foreign_issue(
+        self, guest_client, workspace, project, foreign_issue
+    ):
+        _enable_guest_view_all(project)
+        response = guest_client.get(_description_assets_url(workspace, project, foreign_issue))
+        assert response.status_code == status.HTTP_200_OK

@@ -2199,6 +2199,11 @@ class IssueDescriptionAssetListAPIEndpoint(BaseAPIView):
 
     def get(self, request, slug, project_id, issue_id):
         """List the assets embedded in a work item's description."""
+        # same visibility as the attachment listing: restricted guests only see their own work items
+        issue = Issue.objects.get(pk=issue_id, workspace__slug=slug, project_id=project_id)
+        if guest_cannot_view_issue(request.user.id, issue, slug):
+            raise Issue.DoesNotExist()
+
         description_assets = FileAsset.objects.filter(
             issue_id=issue_id,
             entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
